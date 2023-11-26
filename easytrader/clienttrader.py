@@ -217,6 +217,12 @@ class ClientTrader(IClientTrader):
         return self.trade(security, price, amount)
 
     @perf_clock
+    def buy_credit(self, security, price, amount, **kwargs):
+        self._switch_left_menus_credit(["限价委托","融资买入F11"])
+
+        return self.trade(security, price, amount)
+
+    @perf_clock
     def sell(self, security, price, amount, **kwargs):
         self._switch_left_menus(["卖出[F2]"])
 
@@ -523,6 +529,13 @@ class ClientTrader(IClientTrader):
         self._app.top_window().type_keys('{F5}')
         self.wait(sleep)
 
+    @perf_clock
+    def _switch_left_menus_credit(self, path, sleep=0.2):
+        self.close_pop_dialog()
+        self._get_left_menus_handle_credit().get_item(path).select()
+        self._app.top_window().type_keys('{F5}')
+        self.wait(sleep)
+
     def _switch_left_menus_by_shortcut(self, shortcut, sleep=0.5):
         self.close_pop_dialog()
         self._app.top_window().type_keys(shortcut)
@@ -535,6 +548,24 @@ class ClientTrader(IClientTrader):
             try:
                 handle = self._main.child_window(
                     control_id=129, class_name="SysTreeView32"
+                )
+                if count <= 0:
+                    return handle
+                # sometime can't find handle ready, must retry
+                handle.wait("ready", 2)
+                return handle
+            # pylint: disable=broad-except
+            except Exception as ex:
+                logger.exception("error occurred when trying to get left menus")
+            count = count - 1
+
+    @functools.lru_cache()
+    def _get_left_menus_handle_credit(self):
+        count = 2
+        while True:
+            try:
+                handle = self._main.child_window(
+                    control_id=513, class_name="SysTreeView32"
                 )
                 if count <= 0:
                     return handle

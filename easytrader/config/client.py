@@ -102,7 +102,7 @@ class YH(CommonConfig):
 
 
 class HT(CommonConfig):
-    DEFAULT_EXE_PATH = r"C:\htzqzyb2\xiadan.exe"
+    DEFAULT_EXE_PATH = r"D:\htzqzyb3\xiadan.exe"
 
     BALANCE_CONTROL_ID_GROUP = {
         "资金余额": 1012,

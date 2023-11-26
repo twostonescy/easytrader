@@ -93,6 +93,8 @@ class TradePopDialogHandler(PopDialogHandler):
 
             self._submit_by_click()
             time.sleep(0.05)
-            raise exceptions.TradeError(content)
+            # raise exceptions.TradeError(content)
+            return {"error content": content}
+
         self._close()
         return None
