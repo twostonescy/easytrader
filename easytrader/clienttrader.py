@@ -216,15 +216,23 @@ class ClientTrader(IClientTrader):
 
         return self.trade(security, price, amount)
 
+    # 融资买入
     @perf_clock
     def buy_credit(self, security, price, amount, **kwargs):
-        self._switch_left_menus_credit(["限价委托","融资买入F11"])
+        self._switch_left_menus_credit(["限价委托","融资买入[F11]"])
 
         return self.trade(security, price, amount)
 
     @perf_clock
     def sell(self, security, price, amount, **kwargs):
         self._switch_left_menus(["卖出[F2]"])
+
+        return self.trade(security, price, amount)
+
+    # 担保品卖出
+    @perf_clock
+    def sell_credit(self, security, price, amount, **kwargs):
+        self._switch_left_menus_credit(["限价委托","担保品卖出[F2]"])
 
         return self.trade(security, price, amount)
 
