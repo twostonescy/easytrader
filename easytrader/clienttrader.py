@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import abc
+import binascii
 import functools
+import hashlib
 import logging
 import os
 import re
@@ -8,11 +10,7 @@ import sys
 import time
 from typing import Type, Union
 
-import hashlib, binascii
-
 import easyutils
-from pywinauto import findwindows, timings
-
 from easytrader import grid_strategies, pop_dialog_handler, refresh_strategies
 from easytrader.config import client
 from easytrader.grid_strategies import IGridStrategy
@@ -20,10 +18,12 @@ from easytrader.log import logger
 from easytrader.refresh_strategies import IRefreshStrategy
 from easytrader.utils.misc import file2dict
 from easytrader.utils.perf import perf_clock
+from pywinauto import findwindows, timings
 
 if not sys.platform.startswith("darwin"):
     import pywinauto
     import pywinauto.clipboard
+
 
 class IClientTrader(abc.ABC):
     @property
@@ -76,9 +76,7 @@ class ClientTrader(IClientTrader):
     def grid_strategy_instance(self):
         if self._grid_strategy_instance is None:
             self._grid_strategy_instance = (
-                self.grid_strategy
-                if isinstance(self.grid_strategy, IGridStrategy)
-                else self.grid_strategy()
+                self.grid_strategy if isinstance(self.grid_strategy, IGridStrategy) else self.grid_strategy()
             )
             self._grid_strategy_instance.set_trader(self)
         return self._grid_strategy_instance
@@ -109,9 +107,7 @@ class ClientTrader(IClientTrader):
         """
         connect_path = exe_path or self._config.DEFAULT_EXE_PATH
         if connect_path is None:
-            raise ValueError(
-                "参数 exe_path 未设置，请设置客户端对应的 exe 地址,类似 C:\\客户端安装目录\\xiadan.exe"
-            )
+            raise ValueError("参数 exe_path 未设置，请设置客户端对应的 exe 地址,类似 C:\\客户端安装目录\\xiadan.exe")
 
         self._app = pywinauto.Application().connect(path=connect_path, timeout=10)
         self._close_prompt_windows()
@@ -134,11 +130,7 @@ class ClientTrader(IClientTrader):
     def _get_balance_from_statics(self):
         result = {}
         for key, control_id in self._config.BALANCE_CONTROL_ID_GROUP.items():
-            result[key] = float(
-                self._main.child_window(
-                    control_id=control_id, class_name="Static"
-                ).window_text()
-            )
+            result[key] = float(self._main.child_window(control_id=control_id, class_name="Static").window_text())
         return result
 
     @property
@@ -156,6 +148,11 @@ class ClientTrader(IClientTrader):
     @property
     def today_trades(self):
         self._switch_left_menus(["查询[F4]", "当日成交"])
+
+        return self._get_grid_data(self._config.COMMON_GRID_CONTROL_ID)
+
+    def today_trades_credit(self):
+        self._switch_left_menus_credit(["查询[F4]", "查询成交"])
 
         return self._get_grid_data(self._config.COMMON_GRID_CONTROL_ID)
 
@@ -219,7 +216,7 @@ class ClientTrader(IClientTrader):
     # 融资买入
     @perf_clock
     def buy_credit(self, security, price, amount, **kwargs):
-        self._switch_left_menus_credit(["限价委托","融资买入[F11]"])
+        self._switch_left_menus_credit(["限价委托", "融资买入[F11]"])
 
         return self.trade(security, price, amount)
 
@@ -232,7 +229,7 @@ class ClientTrader(IClientTrader):
     # 担保品卖出
     @perf_clock
     def sell_credit(self, security, price, amount, **kwargs):
-        self._switch_left_menus_credit(["限价委托","担保品卖出[F2]"])
+        self._switch_left_menus_credit(["限价委托", "担保品卖出[F2]"])
 
         return self.trade(security, price, amount)
 
@@ -295,15 +292,11 @@ class ClientTrader(IClientTrader):
         self._set_market_trade_params(security, amount, limit_price=limit_price)
         self._submit_trade()
 
-        return self._handle_pop_dialogs(
-            handler_class=pop_dialog_handler.TradePopDialogHandler
-        )
+        return self._handle_pop_dialogs(handler_class=pop_dialog_handler.TradePopDialogHandler)
 
     def _set_market_trade_type(self, ttype):
         """根据选择的市价交易类型选择对应的下拉选项"""
-        selects = self._main.child_window(
-            control_id=self._config.TRADE_MARKET_TYPE_CONTROL_ID, class_name="ComboBox"
-        )
+        selects = self._main.child_window(control_id=self._config.TRADE_MARKET_TYPE_CONTROL_ID, class_name="ComboBox")
         for i, text in enumerate(selects.texts()):
             # skip 0 index, because 0 index is current select index
             if i == 0:
@@ -341,9 +334,7 @@ class ClientTrader(IClientTrader):
 
         if len(stock_list) == 0:
             return {"message": "今日无新股"}
-        invalid_list_idx = [
-            i for i, v in enumerate(stock_list) if v[self.config.AUTO_IPO_NUMBER] <= 0
-        ]
+        invalid_list_idx = [i for i, v in enumerate(stock_list) if v[self.config.AUTO_IPO_NUMBER] <= 0]
 
         if len(stock_list) == len(invalid_list_idx):
             return {"message": "没有发现可以申购的新股"}
@@ -362,10 +353,7 @@ class ClientTrader(IClientTrader):
 
     def _click_grid_by_row(self, row):
         x = self._config.COMMON_GRID_LEFT_MARGIN
-        y = (
-            self._config.COMMON_GRID_FIRST_ROW_HEIGHT
-            + self._config.COMMON_GRID_ROW_HEIGHT * row
-        )
+        y = self._config.COMMON_GRID_FIRST_ROW_HEIGHT + self._config.COMMON_GRID_ROW_HEIGHT * row
         self._app.top_window().child_window(
             control_id=self._config.COMMON_GRID_CONTROL_ID,
             class_name="CVirtualGridCtrl",
@@ -375,9 +363,7 @@ class ClientTrader(IClientTrader):
     def is_exist_pop_dialog(self):
         self.wait(0.5)  # wait dialog display
         try:
-            return (
-                self._main.wrapper_object() != self._app.top_window().wrapper_object()
-            )
+            return self._main.wrapper_object() != self._app.top_window().wrapper_object()
         except (
             findwindows.ElementNotFoundError,
             timings.TimeoutError,
@@ -395,9 +381,9 @@ class ClientTrader(IClientTrader):
                     w.close()
                     self.wait(0.2)
         except (
-                findwindows.ElementNotFoundError,
-                timings.TimeoutError,
-                RuntimeError,
+            findwindows.ElementNotFoundError,
+            timings.TimeoutError,
+            RuntimeError,
         ) as ex:
             pass
 
@@ -430,35 +416,23 @@ class ClientTrader(IClientTrader):
 
         self._submit_trade()
 
-        return self._handle_pop_dialogs(
-            handler_class=pop_dialog_handler.TradePopDialogHandler
-        )
+        return self._handle_pop_dialogs(handler_class=pop_dialog_handler.TradePopDialogHandler)
 
     def _click(self, control_id):
-        self._app.top_window().child_window(
-            control_id=control_id, class_name="Button"
-        ).click()
+        self._app.top_window().child_window(control_id=control_id, class_name="Button").click()
 
     @perf_clock
     def _submit_trade(self):
         time.sleep(0.2)
-        self._main.child_window(
-            control_id=self._config.TRADE_SUBMIT_CONTROL_ID, class_name="Button"
-        ).click()
+        self._main.child_window(control_id=self._config.TRADE_SUBMIT_CONTROL_ID, class_name="Button").click()
 
     @perf_clock
     def __get_top_window_pop_dialog(self):
-        return self._app.top_window().window(
-            control_id=self._config.POP_DIALOD_TITLE_CONTROL_ID
-        )
+        return self._app.top_window().window(control_id=self._config.POP_DIALOD_TITLE_CONTROL_ID)
 
     @perf_clock
     def _get_pop_dialog_title(self):
-        return (
-            self._app.top_window()
-            .child_window(control_id=self._config.POP_DIALOD_TITLE_CONTROL_ID)
-            .window_text()
-        )
+        return self._app.top_window().child_window(control_id=self._config.POP_DIALOD_TITLE_CONTROL_ID).window_text()
 
     def _set_trade_params(self, security, price, amount):
         code = security[-6:]
@@ -480,14 +454,10 @@ class ClientTrader(IClientTrader):
             self._config.TRADE_PRICE_CONTROL_ID,
             easyutils.round_price_by_code(price, code),
         )
-        self._type_edit_control_keys(
-            self._config.TRADE_AMOUNT_CONTROL_ID, str(int(amount))
-        )
+        self._type_edit_control_keys(self._config.TRADE_AMOUNT_CONTROL_ID, str(int(amount)))
 
     def _set_market_trade_params(self, security, amount, limit_price=None):
-        self._type_edit_control_keys(
-            self._config.TRADE_AMOUNT_CONTROL_ID, str(int(amount))
-        )
+        self._type_edit_control_keys(self._config.TRADE_AMOUNT_CONTROL_ID, str(int(amount)))
         self.wait(0.1)
         price_control = None
         if str(security).startswith("68"):  # 科创板存在限价
@@ -504,15 +474,11 @@ class ClientTrader(IClientTrader):
         return self.grid_strategy_instance.get(control_id)
 
     def _type_keys(self, control_id, text):
-        self._main.child_window(control_id=control_id, class_name="Edit").set_edit_text(
-            text
-        )
+        self._main.child_window(control_id=control_id, class_name="Edit").set_edit_text(text)
 
     def _type_edit_control_keys(self, control_id, text):
         if not self._editor_need_type_keys:
-            self._main.child_window(
-                control_id=control_id, class_name="Edit"
-            ).set_edit_text(text)
+            self._main.child_window(control_id=control_id, class_name="Edit").set_edit_text(text)
         else:
             editor = self._main.child_window(control_id=control_id, class_name="Edit")
             editor.select()
@@ -534,14 +500,14 @@ class ClientTrader(IClientTrader):
     def _switch_left_menus(self, path, sleep=0.2):
         self.close_pop_dialog()
         self._get_left_menus_handle().get_item(path).select()
-        self._app.top_window().type_keys('{F5}')
+        self._app.top_window().type_keys("{F5}")
         self.wait(sleep)
 
     @perf_clock
     def _switch_left_menus_credit(self, path, sleep=0.2):
         self.close_pop_dialog()
         self._get_left_menus_handle_credit().get_item(path).select()
-        self._app.top_window().type_keys('{F5}')
+        self._app.top_window().type_keys("{F5}")
         self.wait(sleep)
 
     def _switch_left_menus_by_shortcut(self, shortcut, sleep=0.5):
@@ -554,9 +520,7 @@ class ClientTrader(IClientTrader):
         count = 2
         while True:
             try:
-                handle = self._main.child_window(
-                    control_id=129, class_name="SysTreeView32"
-                )
+                handle = self._main.child_window(control_id=129, class_name="SysTreeView32")
                 if count <= 0:
                     return handle
                 # sometime can't find handle ready, must retry
@@ -572,9 +536,7 @@ class ClientTrader(IClientTrader):
         count = 2
         while True:
             try:
-                handle = self._main.child_window(
-                    control_id=513, class_name="SysTreeView32"
-                )
+                handle = self._main.child_window(control_id=513, class_name="SysTreeView32")
                 if count <= 0:
                     return handle
                 # sometime can't find handle ready, must retry
@@ -587,10 +549,7 @@ class ClientTrader(IClientTrader):
 
     def _cancel_entrust_by_double_click(self, row):
         x = self._config.CANCEL_ENTRUST_GRID_LEFT_MARGIN
-        y = (
-            self._config.CANCEL_ENTRUST_GRID_FIRST_ROW_HEIGHT
-            + self._config.CANCEL_ENTRUST_GRID_ROW_HEIGHT * row
-        )
+        y = self._config.CANCEL_ENTRUST_GRID_FIRST_ROW_HEIGHT + self._config.CANCEL_ENTRUST_GRID_ROW_HEIGHT * row
         self._app.top_window().child_window(
             control_id=self._config.COMMON_GRID_CONTROL_ID,
             class_name="CVirtualGridCtrl",
@@ -622,15 +581,7 @@ class BaseLoginClientTrader(ClientTrader):
         """Login Client Trader"""
         pass
 
-    def prepare(
-        self,
-        config_path=None,
-        user=None,
-        password=None,
-        exe_path=None,
-        comm_password=None,
-        **kwargs
-    ):
+    def prepare(self, config_path=None, user=None, password=None, exe_path=None, comm_password=None, **kwargs):
         """
         登陆客户端
         :param config_path: 登陆配置文件，跟参数登陆方式二选一
@@ -646,11 +597,5 @@ class BaseLoginClientTrader(ClientTrader):
             password = account["password"]
             comm_password = account.get("comm_password")
             exe_path = account.get("exe_path")
-        self.login(
-            user,
-            password,
-            exe_path or self._config.DEFAULT_EXE_PATH,
-            comm_password,
-            **kwargs
-        )
+        self.login(user, password, exe_path or self._config.DEFAULT_EXE_PATH, comm_password, **kwargs)
         self._init_toolbar()
