@@ -151,8 +151,9 @@ class ClientTrader(IClientTrader):
 
         return self._get_grid_data(self._config.COMMON_GRID_CONTROL_ID)
 
-    def today_trades_credit(self):
-        self._switch_left_menus_credit(["查询[F4]", "查询成交"])
+    def today_trades_credit(self, is_target_date):
+        if is_target_date is False:
+            self._switch_left_menus_credit(["查询[F4]", "查询成交"])
 
         return self._get_grid_data(self._config.COMMON_GRID_CONTROL_ID)
 
